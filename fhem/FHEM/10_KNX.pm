@@ -37,6 +37,7 @@
 # ABU 20170622 finetuned doku
 # ABU 20171006 added sub-dpt1
 # ABU 20171006 added dpt19
+# rapante85 20171017 added off-for-timer
 
 package main;
 
@@ -54,6 +55,7 @@ my $modelErr = "MODEL_NOT_DEFINED";
 my $OFF = "off";
 my $ON = "on";
 my $ONFORTIMER = "on-for-timer";
+my $OFFFORTIMER = "off-for-timer";
 my $ONUNTIL = "on-until";
 my $VALUE = "value";
 my $STRING = "string";
@@ -67,6 +69,7 @@ my %sets = (
 	$OFF => "",
 	$ON => "",
 	$ONFORTIMER => "",
+	$OFFFORTIMER => "",
 	$ONUNTIL => "",
 	$VALUE => "",
 	$STRING => "",
@@ -494,6 +497,11 @@ KNX_Set($@) {
 		CommandDelete(undef, $name . "_timer_$groupnr");
 		delete $hash->{"ON-FOR-TIMER_G$groupnr"};
 	}
+	if ($hash->{"OFF-FOR-TIMER_G$groupnr"})
+	{
+		CommandDelete(undef, $name . "_timer_$groupnr");
+		delete $hash->{"OFF-FOR-TIMER_G$groupnr"};
+	}
 	if($hash->{"ON-UNTIL_G$groupnr"}) 
 	{
 		CommandDelete(undef, $name . "_until_$groupnr");
@@ -513,6 +521,20 @@ KNX_Set($@) {
 		$value = 1;
 		#place at-command for switching off
 		CommandDefine(undef, $name . "_timer_$groupnr at +$duration set $name off g$groupnr");
+	} 
+	#set off-for-timer
+	if ($cmd =~ m/$OFFFORTIMER/)
+	{
+		return "\"off-for-timer\" only allowed for dpt1" if (not($code eq "dpt1"));
+		#get duration
+		my $duration = sprintf("%02d:%02d:%02d", $a[2]/3600, ($a[2]%3600)/60, $a[2]%60);
+		#$modules{KNX}{"off-for-timer"}{$name} = $duration;
+		$hash->{"OFF-FOR-TIMER_G$groupnr"} = $duration;
+		Log3 ($name, 5, "set $name: \"off-for-timer\" for $duration");		
+		#set to on
+		$value = 0;
+		#place at-command for switching on
+		CommandDefine(undef, $name . "_timer_$groupnr at +$duration set $name on g$groupnr");
 	} 
 	#set on-till
 	elsif ($cmd =~ m/$ONUNTIL/)
@@ -1679,7 +1701,7 @@ sub KNX_getCmdList ($$$)
   It is mainly based on a twisted pair wiring, but also other mediums (ip, wireless) are specified.</p>
   For getting started, please refer to this document: <a href="http://www.knx.org/media/docs/Flyers/KNX-Basics/KNX-Basics_de.pdf">KNX-Basics</a>
 
-<p>While the module <a href="#TUL">TUL</a> represents the connection to the KNX network, the KNX modules represent individual KNX devices. This module provides a basic set of operations (on, off, on-until, on-for-timer)
+<p>While the module <a href="#TUL">TUL</a> represents the connection to the KNX network, the KNX modules represent individual KNX devices. This module provides a basic set of operations (on, off, on-until, on-for-timer, off-for-timer)
   to switch on/off KNX devices. For numeric DPT you can use value (set &lt;devname&gt; value &lt;177.45&gt;). For string-DPT you can use string (set &lt;devname&gt; string &lt;Hello World&gt;). For other, non-defined 
   dpt you can send raw hex values to the network (set &lt;devname&gt; raw &lt;hexval&gt;).<br> 
   Sophisticated setups can be achieved by combining a number of KNX module instances. Therefore you can define a number of different GAD/DPT combinations per each device.</p>
@@ -1735,6 +1757,7 @@ sub KNX_getCmdList ($$$)
       set lamp1 on
       set lamp1 off
       set lamp1 on-for-timer 10
+      set lamp1 off-for-timer 10
       set lamp1 on-until 13:15:00
       set foobar raw 234578
       set thermo value 23.44
@@ -1922,7 +1945,7 @@ sub KNX_getCmdList ($$$)
 	dpt9.006 -670760.0..+670760.0 Pa<br>	
 	dpt9.007 -670760.0..+670760.0 %<br>
 	dpt9.008 -670760.0..+670760.0 ppm<br>	
-	dpt9.009 -670760.0..+670760.0 m³/h<br>
+	dpt9.009 -670760.0..+670760.0 mÂ³/h<br>
 	dpt9.010 -670760.0..+670760.0 s<br>
 	dpt9.021 -670760.0..+670760.0 mA<br>	
 	dpt9.024 -670760.0..+670760.0 kW<br>
@@ -1950,7 +1973,7 @@ sub KNX_getCmdList ($$$)
 =end html
 =device
 =item summary Communicates to KNX via module TUL
-=item summary_DE Kommuniziert mit dem KNX über das Modul TUL
+=item summary_DE Kommuniziert mit dem KNX Ã¼ber das Modul TUL
 =begin html_DE
 
 <a name="KNX"></a> 
@@ -1979,11 +2002,11 @@ sub KNX_getCmdList ($$$)
     <p>Jedes Device muss an eine <a href="#TUL">TUL</a> gebunden sein. Die &lt;group&gt; Parameter werden entweder als Gruppenadresse (0-15/0-15/0-255) oder als Hex-notation angegeben (0-f0-f0-ff).
     Alle definierten Gruppen k&ouml;nnen f&uuml;r die Buskommunikation verwendet werden. Ohne weitere Attribute, werden alle eingehenden Nachrichten in state &uuml;bersetzt. 
 	Per default wird &uuml;ber die erste Gruppe gesendet.<br>
-	Wenn Ihr einen readingNamen angebt, wird dieser als Basis für die Readings benutzt (z.B. hugo-set, hugo-get for name hugo).<br>
+	Wenn Ihr einen readingNamen angebt, wird dieser als Basis fÃ¼r die Readings benutzt (z.B. hugo-set, hugo-get for name hugo).<br>
 	Wollt Ihr &uuml;ber eine andere Gruppe senden. m&uuml;sst Ihr diese indizieren (set &lt;devname&gt; value &lt;17.0&gt; &lt;g2&gt;).</p>
 	
     <p>Das Modul <a href="#autocreate">autocreate</a> generiert eine Instanz f&uuml;r jede unbekannte Gruppenadresse. Das Ger&auml;t selbst wird jedoch NICHT korrekt funktionieren, so lange noch kein korrekter 
-	DPT angelegt ist. Der Name ist immer KNX_nnmmooo wobei nn die Linie ist, mm der Bereich und ooo die Geräteadresse.</p>
+	DPT angelegt ist. Der Name ist immer KNX_nnmmooo wobei nn die Linie ist, mm der Bereich und ooo die GerÃ¤teadresse.</p>
 
     <p>Example:</p>
       <pre>
@@ -1992,9 +2015,9 @@ sub KNX_getCmdList ($$$)
       define lamp1 KNX 0A0C:dpt1.003 myTul
       </pre>
 	  
-	Ein Hinweis bezüglich dem binären Datentyp dpt1: alle Untertypen müssen über das Schlüsselwort value gesetzt werden. Empfangene Telegramme werden entsprechend ihrer Definition automatisch
+	Ein Hinweis bezÃ¼glich dem binÃ¤ren Datentyp dpt1: alle Untertypen mÃ¼ssen Ã¼ber das SchlÃ¼sselwort value gesetzt werden. Empfangene Telegramme werden entsprechend ihrer Definition automatisch
 	umbenannt. Zu sendende Telegramme sind immer min on/off zu belegen!<br>
-	Die zur Verfügung stehenden on/off Schaltflächen ohne den Schlüssel value sind ein absoluter Sonderfall und gelten für den dpt1 und alle Untertypen.
+	Die zur VerfÃ¼gung stehenden on/off SchaltflÃ¤chen ohne den SchlÃ¼ssel value sind ein absoluter Sonderfall und gelten fÃ¼r den dpt1 und alle Untertypen.
 	
     <p>Example:</p>
       <pre>
@@ -2018,6 +2041,7 @@ sub KNX_getCmdList ($$$)
       set lamp1 on
       set lamp1 off
       set lamp1 on-for-timer 10
+      set lamp1 off-for-timer 10
       set lamp1 on-until 13:15:00
       set foobar raw 234578
       set thermo value 23.44
@@ -2103,9 +2127,9 @@ sub KNX_getCmdList ($$$)
   <p><a name="KNXstateRegex"></a> <b>stateRegex</b></p>
   <ul> 
 	Es kann eine Reihe an Search/Replace Patterns &uuml;bergeben werden (getrennt durch einen Slash). Intern wird der neue Wert von state immer im Format getG&lt;group&gt;:&lt;state-value&gt;. abgebildet. 
-	Die Ersetzungen werden bei bei jedem neuen Telegramm vorgenommen. Ihr k&ouml;nnt die Funktion f&uuml;r Konvertierungen nutzen, Einheiten hinzuf&uuml;gen, Spaß mit Icons haben, ...
+	Die Ersetzungen werden bei bei jedem neuen Telegramm vorgenommen. Ihr k&ouml;nnt die Funktion f&uuml;r Konvertierungen nutzen, Einheiten hinzuf&uuml;gen, SpaÃŸ mit Icons haben, ...
 	Diese Funktion wirkt nur auf den Inhalt von State - sonst wird nichts beeinflusst.
-	Die Funktion wird direkt nach dem Ersetzen der Readings-Namen und dem ergänzen der Formate ausgeführt.
+	Die Funktion wird direkt nach dem Ersetzen der Readings-Namen und dem ergÃ¤nzen der Formate ausgefÃ¼hrt.
       <p>Example:</p>
       <pre>
       define myLamp KNX 0/1/1:dpt1 0/1/2:dpt1 0/1/2:dpt1
@@ -2116,8 +2140,8 @@ sub KNX_getCmdList ($$$)
  
   <p><a name="KNXstateCmd"></a> <b>stateCmd</b></p>
   <ul>
-	Hier könnt Ihr ein perl-Kommando angeben, welches state beeinflusst. Die Funktion wird unmittelbar vor dem Update des Readings aufgerufen - also nach dem Umbennenen der Readings, format und regex.
-	Es ist ein gültiges Perl-Kommando anzugeben (vgl. stateFormat). Im Gegensatz zu StateFormat wirkt sich dieses Attribut inhaltlich auf das Reading aus, und nicht "nur" auf die Anzeige im FHEMWEB.
+	Hier kÃ¶nnt Ihr ein perl-Kommando angeben, welches state beeinflusst. Die Funktion wird unmittelbar vor dem Update des Readings aufgerufen - also nach dem Umbennenen der Readings, format und regex.
+	Es ist ein gÃ¼ltiges Perl-Kommando anzugeben (vgl. stateFormat). Im Gegensatz zu StateFormat wirkt sich dieses Attribut inhaltlich auf das Reading aus, und nicht "nur" auf die Anzeige im FHEMWEB.
       <p>Beispiel:</p>
       <pre>
       define myLamp KNX 0/1/1:dpt1 0/1/2:dpt1 0/1/2:dpt1
@@ -2204,7 +2228,7 @@ sub KNX_getCmdList ($$$)
 	dpt9.006 -670760.0..+670760.0 Pa<br>	
 	dpt9.007 -670760.0..+670760.0 %<br>
 	dpt9.008 -670760.0..+670760.0 ppm<br>	
-	dpt9.009 -670760.0..+670760.0 m³/h<br>
+	dpt9.009 -670760.0..+670760.0 mÂ³/h<br>
 	dpt9.010 -670760.0..+670760.0 s<br>
 	dpt9.021 -670760.0..+670760.0 mA<br>	
 	dpt9.024 -670760.0..+670760.0 kW<br>
